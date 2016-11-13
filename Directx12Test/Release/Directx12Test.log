@@ -1,0 +1,10 @@
+﻿  MAIN.cpp
+MAIN.cpp(29): warning C4316: 'MAIN': ヒープで割り当てられたオブジェクトが 256 にアラインメントされていない可能性があります
+MAIN.cpp(664): warning C4305: '初期化中': 'double' から 'float' へ切り詰めます。
+MAIN.cpp(727): warning C4244: '引数': 'double' から 'float' への変換です。データが失われる可能性があります。
+  コード生成しています。
+  5 of 196 functions ( 2.6%) were compiled, the rest were copied from previous compilation.
+    1 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  コード生成が終了しました。
+  Directx12Test.vcxproj -> C:\Users\Keisuke Mochida\Documents\Visual Studio 2015\Projects\Directx12Test\Release\Directx12Test.exe
