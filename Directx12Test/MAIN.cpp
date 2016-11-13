@@ -101,59 +101,6 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, TCHAR *lpszCm
 	return (int)msg.wParam;
 }
 
-// ウィンドウプロシージャ
-LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	switch (message)
-	{
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		return 0;
-	}
-
-	return DefWindowProc(hWnd, message, wParam, lParam);
-}
-
-
-bool MAIN::InitWindow()
-{
-
-	// ウィンドウを作成
-	WNDCLASSEX	windowClass = {};
-
-	// ウィンドウクラスを登録
-	windowClass.cbSize = sizeof(WNDCLASSEX);
-	windowClass.style = CS_HREDRAW | CS_VREDRAW;
-	windowClass.lpfnWndProc = WindowProc;
-	windowClass.hInstance = m_hInstance;
-	windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
-	windowClass.lpszClassName = WINDOW_CLASS;
-	RegisterClassEx(&windowClass);
-
-	RECT windowRect = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
-
-	AdjustWindowRect(&windowRect, WINDOW_STYLE, FALSE);
-
-	// ウィンドウを作成
-	hWnd = CreateWindow(
-		WINDOW_CLASS,
-		WINDOW_TITLE,
-		WINDOW_STYLE,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		windowRect.right - windowRect.left,
-		windowRect.bottom - windowRect.top,
-		NULL,		// We have no parent window, NULL.
-		NULL,		// We aren't using menus, NULL.
-		m_hInstance,
-		NULL);		// We aren't using multiple windows, NULL.
-
-	ShowWindow(hWnd, SW_SHOW);
-	UpdateWindow(hWnd);
-
-	return true;
-}
-
 // Device初期化
 bool MAIN::InitDevice()
 {
