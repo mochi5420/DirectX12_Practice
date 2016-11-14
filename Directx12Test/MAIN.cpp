@@ -94,7 +94,7 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, TCHAR *lpszCm
 
 	// 終了時の後処理
 	m_pMain->WaitForPreviousFrame();
-	CloseHandle(m_pMain->g_fenceEvent);
+	CloseHandle(m_pMain->m_FenceEvent);
 
 	delete m_pMain;
 
@@ -122,7 +122,7 @@ bool MAIN::InitDevice()
 		ComPtr<IDXGIAdapter>	warpAdapter;
 		if (FAILED(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)))) return false;
 		if (FAILED(D3D12CreateDevice(warpAdapter.Get(), 
-			D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&g_device)))) return false;
+			D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_pDevice)))) return false;
 	}
 	else {
 		ComPtr<IDXGIAdapter1>	hardwareAdapter;
@@ -141,7 +141,7 @@ bool MAIN::InitDevice()
 		hardwareAdapter = adapter.Detach();
 
 		if (FAILED(D3D12CreateDevice(hardwareAdapter.Get(), 
-			D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&g_device)))) return false;
+			D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_pDevice)))) return false;
 	}
 
 	// コマンドキューを作成
@@ -149,7 +149,7 @@ bool MAIN::InitDevice()
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;	// GPUタイムアウトが有効
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;	// 直接コマンドキュー
 
-	if (FAILED(g_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&g_commandQueue)))) 
+	if (FAILED(m_pDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_pCommandQueue)))) 
 		return false;
 
 	// スワップチェインを作成
@@ -169,14 +169,14 @@ bool MAIN::InitDevice()
 	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
 	ComPtr<IDXGISwapChain>	swapChain;
-	if (FAILED(factory->CreateSwapChain(g_commandQueue.Get(), 
+	if (FAILED(factory->CreateSwapChain(m_pCommandQueue.Get(), 
 		&swapChainDesc, swapChain.GetAddressOf()))) return false;
 
 	// フルスクリーンのサポートなし
 	if (FAILED(factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER))) return false;
 
-	if (FAILED(swapChain.As(&g_swapChain))) return false;
-	g_frameIndex = g_swapChain->GetCurrentBackBufferIndex();
+	if (FAILED(swapChain.As(&m_pSwapChain))) return false;
+	m_FrameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
 
 
 	// レンダーターゲットビュー・深度ステンシルビュー用ディスクリプターヒープを生成.
@@ -188,20 +188,20 @@ bool MAIN::InitDevice()
 		HeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;	// シェーダからアクセスしないのでNONEでOK
 
 		// レンダーターゲットビュー用ディスクリプタヒープを生成.
-		if (FAILED(g_device->CreateDescriptorHeap(&HeapDesc, IID_PPV_ARGS(&g_rtvHeap)))) return false;
+		if (FAILED(m_pDevice->CreateDescriptorHeap(&HeapDesc, IID_PPV_ARGS(&m_pRtvHeap)))) return false;
 
 		// レンダーターゲットビューのディスクリプタサイズを取得.
-		g_rtvDescriptorSize = g_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		m_RtvDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 
 		// 深度ステンシルビュー用ディスクリプタヒープの設定.
 		HeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 
 		// 深度ステンシルビュー用ディスクリプタヒープを生成.
-		if (FAILED(g_device->CreateDescriptorHeap(&HeapDesc, IID_PPV_ARGS(g_dsvHeap.GetAddressOf())))) return false;
+		if (FAILED(m_pDevice->CreateDescriptorHeap(&HeapDesc, IID_PPV_ARGS(m_pDsvHeap.GetAddressOf())))) return false;
 
 		// 深度ステンシルビューのディスクリプタサイズを取得.
-		g_dsvDescriptorSize = g_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+		m_DsvDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 	}
 
 
@@ -209,7 +209,7 @@ bool MAIN::InitDevice()
 	{
 		// CPUハンドルの先頭を取得
 		D3D12_CPU_DESCRIPTOR_HANDLE	HeapDesc = {};
-		HeapDesc.ptr = g_rtvHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+		HeapDesc.ptr = m_pRtvHeap->GetCPUDescriptorHandleForHeapStart().ptr;
 
 		D3D12_RENDER_TARGET_VIEW_DESC desc;
 		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
@@ -222,13 +222,13 @@ bool MAIN::InitDevice()
 		for (UINT i = 0; i<FrameCount; i++) {
 			
 			//バックバッファ取得
-			if (FAILED(g_swapChain->GetBuffer(i, IID_PPV_ARGS(&g_renderTargets[i])))) return false;
+			if (FAILED(m_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_pRenderTargets[i])))) return false;
 			
 			//RTVを作成
-			g_device->CreateRenderTargetView(g_renderTargets[i].Get(), &desc, HeapDesc);
+			m_pDevice->CreateRenderTargetView(m_pRenderTargets[i].Get(), &desc, HeapDesc);
 			
 			//handleのポインタを進める
-			HeapDesc.ptr += g_rtvDescriptorSize;
+			HeapDesc.ptr += m_RtvDescriptorSize;
 		}
 	}
 
@@ -263,9 +263,9 @@ bool MAIN::InitDevice()
 		clearValue.DepthStencil.Stencil = 0;
 
 		// リソースを生成.
-		if(FAILED(g_device->CreateCommittedResource(&prop, D3D12_HEAP_FLAG_NONE,
+		if(FAILED(m_pDevice->CreateCommittedResource(&prop, D3D12_HEAP_FLAG_NONE,
 													&desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearValue,
-													IID_PPV_ARGS(g_depthStencil.GetAddressOf())))) return false;
+													IID_PPV_ARGS(m_pDepthStencil.GetAddressOf())))) return false;
 
 
 		// 深度ステンシルビューの設定.
@@ -275,25 +275,25 @@ bool MAIN::InitDevice()
 		dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 
 		// 深度ステンシルビューを生成.
-		g_device->CreateDepthStencilView(
-			g_depthStencil.Get(),
+		m_pDevice->CreateDepthStencilView(
+			m_pDepthStencil.Get(),
 			&dsvDesc,
-			g_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+			m_pDsvHeap->GetCPUDescriptorHandleForHeapStart());
 	}
 
 	// コマンドアロケーターを作成
-	if (FAILED(g_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, 
-		IID_PPV_ARGS(&g_commandAllocator)))) return false;
+	if (FAILED(m_pDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, 
+		IID_PPV_ARGS(&m_pCommandAllocator)))) return false;
 
 	//ビューポートとシザーボックスの設定
-	g_viewport.Width = (float)WINDOW_WIDTH;
-	g_viewport.Height = (float)WINDOW_HEIGHT;
-	g_viewport.TopLeftX = g_viewport.TopLeftY = 0.0f;
-	g_viewport.MinDepth = 0.0f;
-	g_viewport.MaxDepth = 1.0f;
-	g_scissorRect.left = g_scissorRect.top = 0;
-	g_scissorRect.right = WINDOW_WIDTH;
-	g_scissorRect.bottom = WINDOW_HEIGHT;
+	m_Viewport.Width = (float)WINDOW_WIDTH;
+	m_Viewport.Height = (float)WINDOW_HEIGHT;
+	m_Viewport.TopLeftX = m_Viewport.TopLeftY = 0.0f;
+	m_Viewport.MinDepth = 0.0f;
+	m_Viewport.MaxDepth = 1.0f;
+	m_ScissorRect.left = m_ScissorRect.top = 0;
+	m_ScissorRect.right = WINDOW_WIDTH;
+	m_ScissorRect.bottom = WINDOW_HEIGHT;
 
 	return true;
 }
@@ -303,22 +303,22 @@ bool MAIN::InitAssets()
 {
 	// コマンドリストを作成
 	{
-		if (FAILED(g_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-			g_commandAllocator.Get(), g_pipelineState.Get(), IID_PPV_ARGS(&g_commandList)))) return false;
+		if (FAILED(m_pDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+			m_pCommandAllocator.Get(), m_pPipelineState.Get(), IID_PPV_ARGS(&m_pCommandList)))) return false;
 
 		// コマンドリストを一旦クローズしておく
 		// ループ先頭がコマンドリストクローズ状態として処理されているため？
-		if (FAILED(g_commandList->Close())) return false;
+		if (FAILED(m_pCommandList->Close())) return false;
 	}
 
 	// 同期オブジェクト(Fence)を作成してリソースがGPUにアップロードされるまで待機
 	{
-		if (FAILED(g_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&g_fence)))) return false;
-		g_fenceValue = 1;
+		if (FAILED(m_pDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_pFence)))) return false;
+		m_FenceValue = 1;
 
 		// フレーム同期に使用するイベントハンドラを作成
-		g_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-		if (g_fenceEvent == nullptr) {
+		m_FenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		if (m_FenceEvent == nullptr) {
 			if (FAILED(HRESULT_FROM_WIN32(GetLastError()))) return false;
 		}
 	}
@@ -358,7 +358,7 @@ bool MAIN::InitAssets()
 		if (FAILED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error))) return false;
 
 		// ルートシグニチャを生成
-		if (FAILED(g_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&g_rootSignature)))) return false;
+		if (FAILED(m_pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_pRootSignature)))) return false;
 	}
 
 
@@ -393,7 +393,7 @@ bool MAIN::InitShader()
 	// グラフィックスパイプラインの状態オブジェクトを作成
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC	psoDesc = {};
 	psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-	psoDesc.pRootSignature = g_rootSignature.Get();
+	psoDesc.pRootSignature = m_pRootSignature.Get();
 	{
 		D3D12_SHADER_BYTECODE	shaderBytecode;
 		shaderBytecode.pShaderBytecode = vertexShader->GetBufferPointer();
@@ -452,39 +452,59 @@ bool MAIN::InitShader()
 	psoDesc.SampleDesc.Count = 1;
 
 	// パイプラインステートを生成
-	if (FAILED(g_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&g_pipelineState)))) return false;
+	if (FAILED(m_pDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pPipelineState)))) return false;
 
 	return true;
 }
 
-//Create textures
+////Create textures
 //bool MAIN::CreateTexture()
 //{
-//	// Read DDS file
-//	std::vector<char> texData(4 * 256 * 256);
-//	std::ifstream ifs("d3d12.dds", std::ios::binary);
-//	if (!ifs) {
-//		MessageBox(m_pMain->hWnd, _T("Failed to load Texture"), _T("CreateTexture"), MB_OK | MB_ICONEXCLAMATION);
-//		return false;
+//	HRESULT hr;
+//	D3D12_HEAP_PROPERTIES heapProps;
+//	ZeroMemory(&heapProps, sizeof(heapProps));
+//	ZeroMemory(&descResourceTex, sizeof(descResourceTex));
+//
+//	heapProps.Type = D3D12_HEAP_TYPE_CUSTOM;
+//	heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+//	heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+//	heapProps.CreationNodeMask = 0;
+//	heapProps.VisibleNodeMask = 0;
+//
+//	D3D12_RESOURCE_DESC descResourceTex;
+//	descResourceTex.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+//	descResourceTex.Width = 256; //とりあえず今回は256x256の32bitビットマップを使うため，決め打ち
+//	descResourceTex.Height = 256;
+//	descResourceTex.DepthOrArraySize = 1;
+//	descResourceTex.MipLevels = 1;
+//	descResourceTex.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+//	descResourceTex.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+//	descResourceTex.SampleDesc.Quality = 0;
+//	descResourceTex.SampleDesc.Count = 1;
+//
+//	hr = m_pDevice->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &descResourceTex, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&pTexture));
+//	if (FAILED(hr)) {
+//		return -1;
 //	}
-//	ifs.seekg(128, std::ios::beg); // Skip DDS header
-//	ifs.read(texData.data(), texData.size());
-//	D3D12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-//		DXGI_FORMAT_B8G8R8A8_UNORM, 256, 256, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_NONE,
-//		D3D12_TEXTURE_LAYOUT_UNKNOWN, 0);
-//	CHK(mDev->CreateCommittedResource(
-//		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-//		D3D12_HEAP_FLAG_NONE,
-//		&resourceDesc,
-//		D3D12_RESOURCE_STATE_GENERIC_READ,
-//		nullptr,
-//		IID_PPV_ARGS(mTex.ReleaseAndGetAddressOf())));
-//	mTex->SetName(L"Texure");
-//	D3D12_BOX box = {};
-//	box.right = 256;
-//	box.bottom = 256;
-//	box.back = 1;
-//	CHK(mTex->WriteToSubresource(0, &box, texData.data(), 4 * 256, 4 * 256 * 256));
+//
+//
+//	std::ifstream ifs("test.bmp", std::ios_base::in | std::ios_base::binary);
+//	if (!ifs) {
+//		return -1;
+//	}
+//	BYTE *dat = (BYTE*)malloc(4 * 256 * 256);
+//	ifs.read((char*)dat, 139);  //今回ファイルヘッダは把握しているため切り捨て
+//	ifs.read((char*)dat, 4 * 256 * 256);//データの読み込み
+//
+//										//読み込んだ画像データの書き込み
+//	D3D12_BOX box = { 0, 0, 0, 256, 256, 1 };
+//	hr = pTexture->WriteToSubresource(0, &box, dat, 4 * 256, 4 * 256 * 256);
+//	free(dat);
+//	if (FAILED(hr)) {
+//		return -1;
+//	}
+//
+//	return 0;
 //
 //	return true;
 //}
@@ -523,21 +543,21 @@ bool MAIN::CreateVertexBuffer()
 		resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 		resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-		if (FAILED(g_device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE,
-			&resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&g_vertexBuffer)))) return false;
+		if (FAILED(m_pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE,
+			&resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_pVertexBuffer)))) return false;
 	}
 
 	// 頂点バッファに頂点データをコピー
 	UINT8*		pVertexDataBegin;
 	D3D12_RANGE	readRange = { 0, 0 };		// CPUからバッファを読み込まない設定
-	if (FAILED(g_vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)))) return false;
+	if (FAILED(m_pVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)))) return false;
 	memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
-	g_vertexBuffer->Unmap(0, nullptr);
+	m_pVertexBuffer->Unmap(0, nullptr);
 
 	// 頂点バッファビューを初期化
-	g_vertexBufferView.BufferLocation = g_vertexBuffer->GetGPUVirtualAddress();
-	g_vertexBufferView.StrideInBytes = sizeof(Vertex);
-	g_vertexBufferView.SizeInBytes = sizeof(triangleVertices);
+	m_VertexBufferView.BufferLocation = m_pVertexBuffer->GetGPUVirtualAddress();
+	m_VertexBufferView.StrideInBytes = sizeof(Vertex);
+	m_VertexBufferView.SizeInBytes = sizeof(triangleVertices);
 
 	return true;
 }
@@ -555,7 +575,7 @@ bool MAIN::CreateConstantBuffer()
 																		// DescriptorHeapのどの範囲をどのレジスタに割り当てるかはルートシグネチャ作成時のRangeとParameterで決定する
 		ConstDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;	// シェーダからアクセスする
 
-		if (FAILED(g_device->CreateDescriptorHeap(&ConstDesc, IID_PPV_ARGS(g_constBufferHeap.GetAddressOf())))) return false;
+		if (FAILED(m_pDevice->CreateDescriptorHeap(&ConstDesc, IID_PPV_ARGS(m_pConstBufferHeap.GetAddressOf())))) return false;
 	}
 
 	// 定数バッファリソースを作成
@@ -586,21 +606,21 @@ bool MAIN::CreateConstantBuffer()
 		ConstDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
 		// リソースを生成
-		if (FAILED(g_device->CreateCommittedResource(&prop, D3D12_HEAP_FLAG_NONE,
-			&ConstDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(g_constBuffer.GetAddressOf())))) return false;
+		if (FAILED(m_pDevice->CreateCommittedResource(&prop, D3D12_HEAP_FLAG_NONE,
+			&ConstDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_pConstBuffer.GetAddressOf())))) return false;
 	}
 
 	// 定数バッファのDescriptorをHeapに設定する
 	{
 		D3D12_CONSTANT_BUFFER_VIEW_DESC ConstDesc = {};
-		ConstDesc.BufferLocation = g_constBuffer->GetGPUVirtualAddress();
+		ConstDesc.BufferLocation = m_pConstBuffer->GetGPUVirtualAddress();
 		ConstDesc.SizeInBytes = sizeof(ConstantBuffer);
 
-		g_device->CreateConstantBufferView(&ConstDesc, g_constBufferHeap->GetCPUDescriptorHandleForHeapStart());
+		m_pDevice->CreateConstantBufferView(&ConstDesc, m_pConstBufferHeap->GetCPUDescriptorHandleForHeapStart());
 	}
 
 	// 定数バッファをマップしておく
-	g_constBuffer->Map(0, nullptr, reinterpret_cast<void**>(&g_cbDataBegin));
+	m_pConstBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_pCbDataBegin));
 
 	return true;
 }
@@ -679,9 +699,9 @@ void MAIN::UpdateScene()
 	XMMATRIX wv = XMMatrixMultiply(world, view);
 	XMMATRIX wvp = XMMatrixMultiply(wv, projection);
 
-	XMStoreFloat4x4(&g_constBufferData.mWVP, wvp);
+	XMStoreFloat4x4(&m_ConstBufferData.mWVP, wvp);
 
-	memcpy(g_cbDataBegin, &g_constBufferData, sizeof(g_constBufferData));
+	memcpy(m_pCbDataBegin, &m_ConstBufferData, sizeof(m_ConstBufferData));
 
 }
 
@@ -693,35 +713,35 @@ void MAIN::Draw()
 	//--------------------------------------
 
 	// コマンドアロケータをリセット
-	g_commandAllocator->Reset();
+	m_pCommandAllocator->Reset();
 
 	// コマンドリストをリセット
-	g_commandList->Reset(g_commandAllocator.Get(), g_pipelineState.Get());
+	m_pCommandList->Reset(m_pCommandAllocator.Get(), m_pPipelineState.Get());
 
 	// バックバッファが描画ターゲットとして使用できるようになるまで待つ
 	{
 		D3D12_RESOURCE_BARRIER	resourceBarrier = {};
 		resourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;						// バリアはリソースの状態遷移に対して設置
 		resourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		resourceBarrier.Transition.pResource = g_renderTargets[g_frameIndex].Get();			// リソースは描画ターゲット
+		resourceBarrier.Transition.pResource = m_pRenderTargets[m_FrameIndex].Get();			// リソースは描画ターゲット
 		resourceBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;				// 遷移前はPresent
 		resourceBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;			// 遷移後は描画ターゲット
 		resourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		g_commandList->ResourceBarrier(1, &resourceBarrier);
+		m_pCommandList->ResourceBarrier(1, &resourceBarrier);
 	}
 
 	// バックバッファを描画ターゲットとして設定する
 	D3D12_CPU_DESCRIPTOR_HANDLE	rtvHandle = {};
-	rtvHandle.ptr = g_rtvHeap->GetCPUDescriptorHandleForHeapStart().ptr + g_frameIndex * g_rtvDescriptorSize;
-	g_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+	rtvHandle.ptr = m_pRtvHeap->GetCPUDescriptorHandleForHeapStart().ptr + m_FrameIndex * m_RtvDescriptorSize;
+	m_pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
 	// ビューポートとシザーボックスを設定
-	g_commandList->RSSetViewports(1, &g_viewport);
-	g_commandList->RSSetScissorRects(1, &g_scissorRect);
+	m_pCommandList->RSSetViewports(1, &m_Viewport);
+	m_pCommandList->RSSetScissorRects(1, &m_ScissorRect);
 
 	// バックバッファをクリアする
 	const float	clearColor[] = { 0.017f, 0.017f, 0.017f, 1.0f };
-	g_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	m_pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
 
 	//--------------------------------------
@@ -730,17 +750,17 @@ void MAIN::Draw()
 
 
 	// ルートシグネチャを設定
-	g_commandList->SetGraphicsRootSignature(g_rootSignature.Get());
+	m_pCommandList->SetGraphicsRootSignature(m_pRootSignature.Get());
 
 	// DescriptorHeapを設定
-	g_commandList->SetDescriptorHeaps(1, g_constBufferHeap.GetAddressOf());
-	g_commandList->SetGraphicsRootDescriptorTable(0, g_constBufferHeap->GetGPUDescriptorHandleForHeapStart());
+	m_pCommandList->SetDescriptorHeaps(1, m_pConstBufferHeap.GetAddressOf());
+	m_pCommandList->SetGraphicsRootDescriptorTable(0, m_pConstBufferHeap->GetGPUDescriptorHandleForHeapStart());
 
 
 	// バックバッファに描画
-	g_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	g_commandList->IASetVertexBuffers(0, 1, &g_vertexBufferView);
-	g_commandList->DrawInstanced(3, 1, 0, 0);
+	m_pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	m_pCommandList->IASetVertexBuffers(0, 1, &m_VertexBufferView);
+	m_pCommandList->DrawInstanced(3, 1, 0, 0);
 
 
 
@@ -754,15 +774,15 @@ void MAIN::Draw()
 		D3D12_RESOURCE_BARRIER	resourceBarrier = {};
 		resourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		resourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		resourceBarrier.Transition.pResource = g_renderTargets[g_frameIndex].Get();
+		resourceBarrier.Transition.pResource = m_pRenderTargets[m_FrameIndex].Get();
 		resourceBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		resourceBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 		resourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		g_commandList->ResourceBarrier(1, &resourceBarrier);
+		m_pCommandList->ResourceBarrier(1, &resourceBarrier);
 	}
 
 	// コマンドリストをクローズする
-	g_commandList->Close();
+	m_pCommandList->Close();
 
 
 	//--------------------------------------
@@ -770,25 +790,25 @@ void MAIN::Draw()
 	//--------------------------------------
 
 	// コマンドリストを実行
-	ID3D12CommandList*	ppCommandLists[] = { g_commandList.Get() };
-	g_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+	ID3D12CommandList*	ppCommandLists[] = { m_pCommandList.Get() };
+	m_pCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 	// フレームを最終出力
-	g_swapChain->Present(0, 0);
+	m_pSwapChain->Present(0, 0);
 
 }
 
 void MAIN::WaitForPreviousFrame()
 {
-	const UINT64	fence = g_fenceValue;
-	g_commandQueue->Signal(g_fence.Get(), fence);
-	g_fenceValue++;
+	const UINT64	fence = m_FenceValue;
+	m_pCommandQueue->Signal(m_pFence.Get(), fence);
+	m_FenceValue++;
 
 	// 前のフレームが終了するまで待機
-	if (g_fence->GetCompletedValue() < fence) {
-		g_fence->SetEventOnCompletion(fence, g_fenceEvent);
-		WaitForSingleObject(g_fenceEvent, INFINITE);
+	if (m_pFence->GetCompletedValue() < fence) {
+		m_pFence->SetEventOnCompletion(fence, m_FenceEvent);
+		WaitForSingleObject(m_FenceEvent, INFINITE);
 	}
 
-	g_frameIndex = g_swapChain->GetCurrentBackBufferIndex();
+	m_FrameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
 }

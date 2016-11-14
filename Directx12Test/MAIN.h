@@ -60,43 +60,42 @@ public:
 	HWND hWnd;
 
 	// パイプラインオブジェクト
-	D3D12_VIEWPORT				g_viewport;
-	D3D12_RECT				g_scissorRect;
-	ComPtr<IDXGISwapChain3>			g_swapChain;
-	ComPtr<ID3D12Device>			g_device;
-	ComPtr<ID3D12Resource>			g_renderTargets[FrameCount];
-	ComPtr<ID3D12Resource>             g_depthStencil;
-	ComPtr<ID3D12CommandAllocator>		g_commandAllocator;
-	ComPtr<ID3D12CommandQueue>		g_commandQueue;
-	ComPtr<ID3D12RootSignature>		g_rootSignature;
-	ComPtr<ID3D12DescriptorHeap>		g_rtvHeap;
-	ComPtr<ID3D12DescriptorHeap>       g_dsvHeap;
-	ComPtr<ID3D12PipelineState>		g_pipelineState;
-	ComPtr<ID3D12GraphicsCommandList>	g_commandList;
-	UINT					g_rtvDescriptorSize;
-	UINT					g_dsvDescriptorSize;
+	D3D12_VIEWPORT				m_Viewport;
+	D3D12_RECT				m_ScissorRect;
+	ComPtr<IDXGISwapChain3>			m_pSwapChain;
+	ComPtr<ID3D12Device>			m_pDevice;
+	ComPtr<ID3D12Resource>			m_pRenderTargets[FrameCount];
+	ComPtr<ID3D12Resource>             m_pDepthStencil;
+	ComPtr<ID3D12CommandAllocator>		m_pCommandAllocator;
+	ComPtr<ID3D12CommandQueue>		m_pCommandQueue;
+	ComPtr<ID3D12RootSignature>		m_pRootSignature;
+	ComPtr<ID3D12DescriptorHeap>		m_pRtvHeap;
+	ComPtr<ID3D12DescriptorHeap>       m_pDsvHeap;
+	ComPtr<ID3D12PipelineState>		m_pPipelineState;
+	ComPtr<ID3D12GraphicsCommandList>	m_pCommandList;
+	UINT					m_RtvDescriptorSize;
+	UINT					m_DsvDescriptorSize;
 
 	// リソース
-	ComPtr<ID3D12Resource>		g_vertexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW	g_vertexBufferView;
+	ComPtr<ID3D12Resource>		m_pVertexBuffer;
+	D3D12_VERTEX_BUFFER_VIEW	m_VertexBufferView;
 
-	ComPtr<ID3D12DescriptorHeap> g_constBufferHeap;
-	ComPtr<ID3D12Resource>       g_constBuffer;
-	ConstantBuffer               g_constBufferData;
-	UINT8*                       g_cbDataBegin;
+	ComPtr<ID3D12DescriptorHeap> m_pConstBufferHeap;
+	ComPtr<ID3D12Resource>       m_pConstBuffer;
+	ConstantBuffer               m_ConstBufferData;
+	UINT8*                       m_pCbDataBegin;
 
 	// 同期オブジェクト
-	UINT			g_frameIndex;
-	HANDLE			g_fenceEvent;
-	ComPtr<ID3D12Fence>	g_fence;
-	UINT64			g_fenceValue;
+	UINT			m_FrameIndex;
+	HANDLE			m_FenceEvent;
+	ComPtr<ID3D12Fence>	m_pFence;
+	UINT64			m_FenceValue;
 
 
 	//Method
 	MAIN();
 	~MAIN();
 
-	bool InitWindow();
 	bool InitDevice();		
 	bool InitAssets();
 	bool InitShader();
