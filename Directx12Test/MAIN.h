@@ -85,6 +85,8 @@ public:
 	ConstantBuffer               m_ConstBufferData;
 	UINT8*                       m_pCbDataBegin;
 
+	ComPtr<ID3D12Resource>       m_pTexture;
+
 	// 同期オブジェクト
 	UINT			m_FrameIndex;
 	HANDLE			m_FenceEvent;
@@ -99,7 +101,7 @@ public:
 	bool InitDevice();		
 	bool InitAssets();
 	bool InitShader();
-	bool CreateTexture();
+	bool CreateTexture(int width, int height, const wchar_t* fileName);
 	bool CreateVertexBuffer();
 	bool CreateConstantBuffer();
 

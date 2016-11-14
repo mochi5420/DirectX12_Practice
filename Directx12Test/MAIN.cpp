@@ -458,12 +458,10 @@ bool MAIN::InitShader()
 }
 
 ////Create textures
-//bool MAIN::CreateTexture()
+//bool MAIN::CreateTexture(int width, int height, const wchar_t* fileName)
 //{
 //	HRESULT hr;
-//	D3D12_HEAP_PROPERTIES heapProps;
-//	ZeroMemory(&heapProps, sizeof(heapProps));
-//	ZeroMemory(&descResourceTex, sizeof(descResourceTex));
+//	D3D12_HEAP_PROPERTIES heapProps = {};
 //
 //	heapProps.Type = D3D12_HEAP_TYPE_CUSTOM;
 //	heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
@@ -471,7 +469,7 @@ bool MAIN::InitShader()
 //	heapProps.CreationNodeMask = 0;
 //	heapProps.VisibleNodeMask = 0;
 //
-//	D3D12_RESOURCE_DESC descResourceTex;
+//	D3D12_RESOURCE_DESC descResourceTex = {};
 //	descResourceTex.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 //	descResourceTex.Width = 256; //とりあえず今回は256x256の32bitビットマップを使うため，決め打ち
 //	descResourceTex.Height = 256;
@@ -482,13 +480,13 @@ bool MAIN::InitShader()
 //	descResourceTex.SampleDesc.Quality = 0;
 //	descResourceTex.SampleDesc.Count = 1;
 //
-//	hr = m_pDevice->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &descResourceTex, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&pTexture));
+//	hr = m_pDevice->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &descResourceTex, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_pTexture.GetAddressOf()));
 //	if (FAILED(hr)) {
 //		return -1;
 //	}
 //
 //
-//	std::ifstream ifs("test.bmp", std::ios_base::in | std::ios_base::binary);
+//	std::ifstream ifs(fileName, std::ios_base::in | std::ios_base::binary);
 //	if (!ifs) {
 //		return -1;
 //	}
@@ -498,7 +496,7 @@ bool MAIN::InitShader()
 //
 //										//読み込んだ画像データの書き込み
 //	D3D12_BOX box = { 0, 0, 0, 256, 256, 1 };
-//	hr = pTexture->WriteToSubresource(0, &box, dat, 4 * 256, 4 * 256 * 256);
+//	hr = m_pTexture->WriteToSubresource(0, &box, dat, 4 * 256, 4 * 256 * 256);
 //	free(dat);
 //	if (FAILED(hr)) {
 //		return -1;
@@ -508,8 +506,6 @@ bool MAIN::InitShader()
 //
 //	return true;
 //}
-
-
 
 
 // 頂点バッファを作成
